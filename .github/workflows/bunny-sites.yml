@@ -25,9 +25,10 @@ jobs:
           site: "bunny-mermaid"
           directory: "./public"
           api_key: ${{ secrets.BUNNYNET_API_KEY }}
+          cli_version: "0.22"
 
-      # Keep the 10 newest deploys; the live and rollback deploys are never pruned.
+      # Keep the 3 newest deploys; the live and rollback deploys are never pruned.
       - name: Prune old deploys
-        run: npx -y @bunny.net/cli@0.19 sites deployments prune bunny-mermaid --keep 10 --force
+        run: npx -y @bunny.net/cli@0.22 sites deployments prune bunny-mermaid --keep 3 --force
         env:
           BUNNYNET_API_KEY: ${{ secrets.BUNNYNET_API_KEY }}
