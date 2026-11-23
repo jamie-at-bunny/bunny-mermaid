@@ -20,8 +20,14 @@ jobs:
 
       # No build step: static files deploy as-is.
 
-      - uses: BunnyWay/actions/deploy-site@deploy-site_0.1.0
+      - uses: BunnyWay/actions/deploy-site@deploy-site_0.1.2
         with:
           site: "bunny-mermaid"
           directory: "./public"
           api_key: ${{ secrets.BUNNYNET_API_KEY }}
+
+      # Keep the 10 newest deploys; the live and rollback deploys are never pruned.
+      - name: Prune old deploys
+        run: npx -y @bunny.net/cli@0.19 sites deployments prune bunny-mermaid --keep 10 --force
+        env:
+          BUNNYNET_API_KEY: ${{ secrets.BUNNYNET_API_KEY }}
