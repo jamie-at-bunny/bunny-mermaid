@@ -31,11 +31,8 @@
 html{height:100%}
 body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);
   font-family:"Rubik",system-ui,-apple-system,"Segoe UI",sans-serif;font-size:15px;line-height:1.5}
-header{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;padding:20px 24px 8px}
-h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em;color:var(--brand)}
-header p{margin:0;color:var(--muted);font-size:14px}
-main{display:grid;grid-template-columns:minmax(300px,2fr) 3fr;gap:16px;padding:12px 24px 24px;min-height:calc(100vh - 90px)}
-@media (max-width:860px){main{grid-template-columns:1fr;padding:12px}header{padding:16px 12px 4px}}
+main{display:grid;grid-template-columns:minmax(300px,2fr) 3fr;gap:16px;padding:24px;min-height:100vh}
+@media (max-width:860px){main{grid-template-columns:1fr;padding:12px}}
 .pane{background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-width:0}
 .bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
 .bar.bottom{border-bottom:0;border-top:1px solid var(--line)}
@@ -66,10 +63,6 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
 </style>
 </head>
 <body>
-<header>
-  <h1>Bunny diagram maker</h1>
-  <p>Paste Mermaid, get a bunny.net styled image for the blog.</p>
-</header>
 <main>
   <section class="pane" aria-label="Mermaid source">
     <div class="bar">
