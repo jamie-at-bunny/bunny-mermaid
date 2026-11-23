@@ -69,6 +69,7 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
       <label>Start from
         <select id="sample">
           <option value="">Choose an example…</option>
+          <option value="cache">Cache lifecycle</option>
           <option value="flow">Flowchart</option>
           <option value="seq">Sequence diagram</option>
           <option value="arch">Grouped flowchart</option>
@@ -77,7 +78,7 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
       </label>
     </div>
     <textarea id="src" spellcheck="false" aria-label="Mermaid code"></textarea>
-    <div class="hint">Add <code>:::accent</code> to a node to paint it bunny orange, e.g. <code>B[Edge Script]:::accent</code>. Wrap code in backticks to set it in monospace, e.g. <code>B[`GET /api`]</code>.</div>
+    <div class="hint">Add <code>:::accent</code> to a node to paint it bunny orange, e.g. <code>B[Edge Script]:::accent</code>, or <code>:::pill</code> for a light label node. In Clean, extra lines become pills: <code>C["CDN cache&lt;br&gt;match | put"]</code>. Tint edge labels with <code>|on hit:::green|</code> or <code>|on miss:::orange|</code>. Add a headline with <code>---</code> <code>title: …</code> <code>---</code>. Wrap code in backticks to set it in monospace, e.g. <code>B[`GET /api`]</code>.</div>
   </section>
 
   <section class="pane" aria-label="Preview and export">
@@ -179,7 +180,59 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
     text,tspan{font-weight:500}
   `;
 
+  // "Clean" look: navy cards, pill sub-labels and pill edge labels.
+  const CARD = {
+    light:{
+      bg:["#eff5fc","#dde9f7","#cfe0f3"], node:"#17395c", nodeText:"#ffffff", subBg:"#ffffff", subText:"#17395c",
+      shadow:"#122e4e", shadowOpacity:0.18, title:"#17395c", script:"#9fb2c9",
+      pills:{ blue:["#e4eefb","#3a6aa2"], green:["#e6f4ea","#4e8a64"], orange:["#fbe8e2","#c07254"] }
+    },
+    dark:{
+      bg:["#062543","#051e38","#03192e"], node:"#183d6d", nodeText:"#ffffff", subBg:"#eaf6ff", subText:"#183d6d",
+      shadow:"#000000", shadowOpacity:0.35, title:"#eaf6ff", script:"#4a74a2",
+      pills:{ blue:["#223c6a","#b0e4ff"], green:["#16402f","#8fd6a8"], orange:["#4a2a1e","#ffb38a"] }
+    }
+  };
+  const CARD_VARS = {
+    light:{
+      primaryColor:"#17395c", primaryBorderColor:"#17395c", primaryTextColor:"#ffffff", mainBkg:"#17395c", nodeBorder:"#17395c",
+      lineColor:"#5f7595", textColor:"#17395c", titleColor:"#17395c", edgeLabelBackground:"#e4eefb",
+      clusterBkg:"#f7fafe", clusterBorder:"#c3d4ea",
+      actorBkg:"#17395c", actorBorder:"#17395c", actorLineColor:"#8aa0bd", signalColor:"#5f7595", signalTextColor:"#17395c",
+      labelBoxBkgColor:"#e4eefb", labelBoxBorderColor:"#e4eefb", labelTextColor:"#3a6aa2", loopTextColor:"#3a6aa2"
+    },
+    dark:{
+      primaryColor:"#183d6d", primaryBorderColor:"#183d6d", primaryTextColor:"#ffffff", mainBkg:"#183d6d", nodeBorder:"#183d6d",
+      lineColor:"#8bb3da", textColor:"#e1f2ff", titleColor:"#eaf6ff", edgeLabelBackground:"#223c6a",
+      clusterBkg:"#062543", clusterBorder:"#223c6a",
+      actorBkg:"#183d6d", actorBorder:"#183d6d", actorLineColor:"#4a74a2", signalColor:"#8bb3da", signalTextColor:"#e1f2ff",
+      labelBoxBkgColor:"#223c6a", labelBoxBorderColor:"#223c6a", labelTextColor:"#b0e4ff", loopTextColor:"#b0e4ff"
+    }
+  };
+  const CARD_CSS = t => `
+    .node rect,.node polygon,.node circle,.node ellipse,.node path{rx:18px;ry:18px}
+    .cluster rect{rx:18px;ry:18px;fill-opacity:.55}
+    .flowchart-link{stroke-width:2.4px!important;stroke-linecap:round;stroke-linejoin:round}
+    .flowchart-link.edge-pattern-dotted{stroke:${CARD[t].script}!important;stroke-width:2px!important;stroke-dasharray:2 7!important}
+    .flowchartTitleText,.titleText{font-size:40px!important;font-weight:700!important;letter-spacing:-0.02em;fill:${CARD[t].title}!important}
+  `;
+
   const SAMPLES = {
+    cache:`---
+title: Scripts can now run before or after the cache
+---
+flowchart TB
+  REQ[Request]:::pill --> OCR["onClientRequest<br>before cache"]
+  OCR --> CDN["CDN cache<br>served automatically"]
+  CDN -->|on hit:::green| OCS["onClientResponse<br>before response"]
+  OCS --> RES[Response]:::pill
+  CDN -->|on miss:::orange| OOR[onOriginRequest]
+  OOR --> O[Origin] --> OORS[onOriginResponse]
+  OORS --> OCS
+  OORS -->|write if cacheable| CDN
+  SC["Script cache<br>match | put | delete"]
+  OCR -.- SC
+  OCS -.- SC`,
     flow:`flowchart LR
   U([Visitor]) --> E[Edge Script]:::accent
   E -->|cache hit| C[(Edge cache)]
@@ -226,14 +279,16 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
   function configure(){
     const sketch = state.look === "sketch";
     const font = sketch ? SKETCH_STACK : FONT_STACK;
-    const vars = Object.assign({}, THEMES[state.theme].vars, sketch ? SKETCH_VARS[state.theme] : {}, { fontFamily:font });
+    const vars = Object.assign({}, THEMES[state.theme].vars, sketch ? SKETCH_VARS[state.theme] : CARD_VARS[state.theme], { fontFamily:font, fontSize: sketch ? "16px" : "18px" });
     mermaid.initialize({
       startOnLoad:false, securityLevel:"strict", theme:"base",
       look: sketch ? "handDrawn" : "classic", handDrawnSeed: 7,
       themeVariables:vars,
-      themeCSS:(sketch ? SKETCH_CSS : ACCENT_CSS) + COMMON_CSS + `.bunny-titles text{paint-order:stroke;stroke:${THEMES[state.theme].vars.clusterBkg};stroke-width:8px;stroke-linejoin:round}`,
+      themeCSS:(sketch ? SKETCH_CSS : ACCENT_CSS + CARD_CSS(state.theme)) + COMMON_CSS + `.bunny-titles text{paint-order:stroke;stroke:${THEMES[state.theme].vars.clusterBkg};stroke-width:8px;stroke-linejoin:round}`,
       fontFamily:font, htmlLabels:false,
-      flowchart:{htmlLabels:false, curve:"basis", padding:16, nodeSpacing:48, rankSpacing:56, subGraphTitleMargin:{top:14, bottom:14}},
+      flowchart: sketch
+        ? {htmlLabels:false, curve:"basis", padding:16, nodeSpacing:48, rankSpacing:56, subGraphTitleMargin:{top:14, bottom:14}}
+        : {htmlLabels:false, curve:"basis", padding:30, nodeSpacing:64, rankSpacing:80, wrappingWidth:600, titleTopMargin:40, subGraphTitleMargin:{top:14, bottom:14}},
       sequence:{mirrorActors:false, actorFontFamily:font, messageFontFamily:font, noteFontFamily:font},
       state:{}
     });
@@ -248,11 +303,17 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
     const W = Math.ceil(vw + p*2), H = Math.ceil(vh + p*2);
     const clone = inner.cloneNode(true);
     clone.removeAttribute("style");
+    clone.setAttribute("overflow", "visible");
     clone.setAttribute("x", p); clone.setAttribute("y", p);
     clone.setAttribute("width", vw); clone.setAttribute("height", vh);
     clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
     const body = new XMLSerializer().serializeToString(clone);
-    const bgRect = state.bg === "solid" ? `<rect width="100%" height="100%" fill="${THEMES[state.theme].bg}"/>` : "";
+    let bgRect = "";
+    if(state.bg === "solid" && state.look === "sketch") bgRect = `<rect width="100%" height="100%" fill="${THEMES[state.theme].bg}"/>`;
+    else if(state.bg === "solid"){
+      const [a,b,c] = CARD[state.theme].bg;
+      bgRect = `<defs><linearGradient id="bunny-bg" x1="0.3" y1="0" x2="0.7" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="0.52" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#bunny-bg)"/>`;
+    }
     const fontCss = `@font-face{font-family:"Rubik";font-weight:300 800;src:url(data:font/woff2;base64,${FONT_B64}) format("woff2");}@font-face{font-family:"JetBrains Mono";font-weight:500;src:url(data:font/woff2;base64,${MONO_B64}) format("woff2");}@font-face{font-family:"Excalifont";src:url(data:font/woff2;base64,${EXCALI_B64}) format("woff2");}`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${fontCss}</style>${bgRect}${body}</svg>`;
     return { svg, W, H };
@@ -300,6 +361,134 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
     });
   }
 
+  const NS = "http://www.w3.org/2000/svg";
+  const PILL_RE = /\s*:::(green|orange|blue)\s*$/;
+  function svgEl(doc, name, attrs){
+    const n = doc.createElementNS(NS, name);
+    for(const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function rowsOf(textEl){
+    const rows = [...textEl.querySelectorAll(":scope > tspan.text-outer-tspan")];
+    return (rows.length ? rows : [textEl]).map(r => r.textContent.replace(/\s+/g, " ").trim());
+  }
+  function stripPillMarkers(root){
+    root.querySelectorAll(".edgeLabel text").forEach(t => {
+      t.querySelectorAll("tspan").forEach(ts => { if(!ts.children.length) ts.textContent = ts.textContent.replace(/:::(green|orange|blue)\b/, ""); });
+    });
+    return [];
+  }
+
+  // Rebuild node and edge labels as cards with pill sub-labels. Sizes are filled in by layoutCards.
+  function cardify(root){
+    const doc = root.ownerDocument, t = CARD[state.theme], out = [];
+    const defs = root.querySelector("defs") || root.insertBefore(svgEl(doc, "defs", {}), root.firstChild);
+    const f = svgEl(doc, "filter", { id:"bunny-shadow", x:"-30%", y:"-30%", width:"160%", height:"190%" });
+    f.appendChild(svgEl(doc, "feDropShadow", { dx:0, dy:10, stdDeviation:12, "flood-color":t.shadow, "flood-opacity":t.shadowOpacity }));
+    defs.appendChild(f);
+
+    root.querySelectorAll("g.node").forEach(node => {
+      const shape = node.querySelector(":scope > rect, :scope > polygon, :scope > circle, :scope > ellipse, :scope > path, :scope > g > path");
+      const label = node.querySelector(":scope > g.label");
+      const text = label && label.querySelector("text");
+      if(!shape || !text) return;
+      const pill = node.classList.contains("pill");
+      const accent = node.classList.contains("accent");
+      const [pillBg, pillInk] = t.pills.blue;
+      if(pill){
+        shape.setAttribute("style", `fill:${pillBg}!important`);
+      } else {
+        shape.setAttribute("filter", "url(#bunny-shadow)");
+      }
+      const rows = rowsOf(text);
+      const g = svgEl(doc, "g", { class:"bunny-card" });
+      const title = svgEl(doc, "text", { "text-anchor":"middle", "dominant-baseline":"central", "font-size":pill ? 16 : 20, "font-weight":500, style:`fill:${pill ? pillInk : accent ? "#051e38" : t.nodeText}!important;letter-spacing:-0.01em` });
+      title.textContent = rows[0];
+      g.appendChild(title);
+      const subs = rows.slice(1).map(row => row.split(/\s+\|\s+/).filter(Boolean).map(word => {
+        const pg = svgEl(doc, "g", {});
+        pg.appendChild(svgEl(doc, "rect", { rx:13, ry:13, height:26, style:`fill:${t.subBg}!important;stroke:none!important;rx:13px;ry:13px` }));
+        const tx = svgEl(doc, "text", { "text-anchor":"middle", "dominant-baseline":"central", "font-size":14, style:`fill:${t.subText}!important;font-weight:400!important` });
+        tx.textContent = word;
+        pg.appendChild(tx);
+        g.appendChild(pg);
+        return pg;
+      }));
+      label.replaceWith(g);
+      out.push({ kind:"node", node, shape, g, title, subs, pill });
+    });
+
+    root.querySelectorAll("g.edgeLabel").forEach(edge => {
+      const text = edge.querySelector("text");
+      if(!text) return;
+      let raw = rowsOf(text).join(" ");
+      if(!raw) { edge.querySelectorAll("rect").forEach(r => r.remove()); return; }
+      const m = raw.match(PILL_RE);
+      const tone = m ? m[1] : "blue";
+      raw = raw.replace(PILL_RE, "");
+      const [bg, ink] = t.pills[tone];
+      const g = svgEl(doc, "g", { class:"bunny-pill" });
+      g.appendChild(svgEl(doc, "rect", { rx:14, ry:14, height:28, style:`fill:${bg}!important;opacity:1;stroke:none;rx:14px;ry:14px` }));
+      const tx = svgEl(doc, "text", { "text-anchor":"middle", "dominant-baseline":"central", "font-size":14, "font-weight":500, style:`fill:${ink}!important` });
+      tx.textContent = raw;
+      g.appendChild(tx);
+      edge.innerHTML = "";
+      edge.appendChild(g);
+      out.push({ kind:"edge", g });
+    });
+    return out;
+  }
+
+  // Measure text in the live DOM, then size the pills and centre each card's content.
+  function layoutCards(root, items){
+    if(!items.length) return;
+    const host = document.createElement("div");
+    host.style.cssText = "position:absolute;left:-99999px;top:0;visibility:hidden";
+    host.appendChild(root);
+    document.body.appendChild(host);
+    try{
+      const W = el => el.getComputedTextLength();
+      items.forEach(it => {
+        if(it.kind === "edge"){
+          const [rect, tx] = it.g.children;
+          const w = W(tx) + 28;
+          rect.setAttribute("width", w); rect.setAttribute("x", -w/2); rect.setAttribute("y", -14);
+          return;
+        }
+        const TITLE = 22, ROW = 26, GAP_T = 12, GAP_R = 8, GAP_P = 8;
+        const n = it.subs.length;
+        const total = TITLE + (n ? GAP_T + n * ROW + (n - 1) * GAP_R : 0);
+        let y = -total/2;
+        it.title.setAttribute("y", y + TITLE/2);
+        y += TITLE + GAP_T;
+        it.subs.forEach(row => {
+          const widths = row.map(pg => W(pg.lastChild) + 26);
+          const rowW = widths.reduce((a,b) => a + b, 0) + GAP_P * (row.length - 1);
+          let x = -rowW/2;
+          row.forEach((pg, i) => {
+            const [rect, tx] = pg.children;
+            rect.setAttribute("x", x); rect.setAttribute("y", y); rect.setAttribute("width", widths[i]);
+            tx.setAttribute("x", x + widths[i]/2); tx.setAttribute("y", y + ROW/2);
+            x += widths[i] + GAP_P;
+          });
+          y += ROW + GAP_R;
+        });
+        // Grow the card if the pills need more room than Mermaid reserved.
+        if(it.shape.tagName === "rect"){
+          const bb = it.g.getBBox();
+          const h = +it.shape.getAttribute("height"), w = +it.shape.getAttribute("width");
+          const nh = Math.max(h, bb.height + 40), nw = Math.max(w, bb.width + 48);
+          if(nh !== h){ it.shape.setAttribute("height", nh); it.shape.setAttribute("y", -nh/2); }
+          if(nw !== w){ it.shape.setAttribute("width", nw); it.shape.setAttribute("x", -nw/2); }
+          if(it.pill){ const r = Math.min(nh, nw)/2; it.shape.setAttribute("rx", r); it.shape.setAttribute("ry", r); it.shape.style.rx = r + "px"; it.shape.style.ry = r + "px"; }
+        }
+      });
+    } finally {
+      host.remove();
+      root.remove();
+    }
+  }
+
   function paintPreview(){
     if(!state.svg) return;
     const { svg, W, H } = buildExportSvg();
@@ -326,8 +515,11 @@ pre.err{white-space:pre-wrap;color:#ff2a64;font:12.5px/1.5 ui-monospace,Menlo,mo
       const doc = new DOMParser().parseFromString(svg, "image/svg+xml");
       const el = doc.documentElement;
       if(el.nodeName !== "svg") throw new Error("Mermaid did not return an SVG.");
+      const card = state.look !== "sketch";
+      const labelled = card ? cardify(el) : stripPillMarkers(el);
       markCode(el);
       liftClusterTitles(el);
+      if(card) layoutCards(el, labelled);
       state.svg = el;
       paintPreview();
       setExport(true);
